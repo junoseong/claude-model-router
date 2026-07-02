@@ -1,9 +1,29 @@
 [project]
-name = "model-router"
-version = "0.1.0"
-description = "Cost-aware model routing for the Claude API"
+name = "claude-model-router"
+version = "0.2.0"
+description = "Cost-aware model routing for the Claude API — reference implementation with a Claude Code subagent hook"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Juno Seong" }]
 requires-python = ">=3.10"
 dependencies = ["anthropic>=0.115"]
+keywords = ["claude", "anthropic", "llm", "model-routing", "cost-optimization"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries",
+]
+
+[project.urls]
+Homepage = "https://github.com/junoseong/claude-model-router"
+Repository = "https://github.com/junoseong/claude-model-router"
+Issues = "https://github.com/junoseong/claude-model-router/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
