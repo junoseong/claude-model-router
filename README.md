@@ -1,12 +1,56 @@
 # claude-model-router
 
-Reference implementation of cost-aware model routing for the Claude API —
-plus a Claude Code hook that stops subagents from silently inheriting your
-most expensive model.
+**why pay Fable price when Haiku do trick**
 
-A cheap Haiku 4.5 call classifies each prompt's complexity; the prompt then
-executes on the cheapest capable tier. Small, tested, and built around the
-parts naive routers get wrong.
+[![PyPI](https://img.shields.io/pypi/v/claude-model-router)](https://pypi.org/project/claude-model-router/)
+[![CI](https://github.com/junoseong/claude-model-router/actions/workflows/test.yml/badge.svg)](https://github.com/junoseong/claude-model-router/actions/workflows/test.yml)
+[![Python](https://img.shields.io/pypi/pyversions/claude-model-router)](https://pypi.org/project/claude-model-router/)
+[![License](https://img.shields.io/github/license/junoseong/claude-model-router)](LICENSE)
+
+[Before / After](#before--after) • [Why routers break](#why-naive-claude-routers-break) • [Install](#install) • [Benchmarks](#benchmarks) • [Claude Code hook](#the-claude-code-hook-your-subagents-are-billing-at-fable-rates)
+
+One cheap Haiku call classifies each prompt's difficulty; execution lands on
+the cheapest Claude model that can actually handle it. Ships with a Claude
+Code hook that stops subagents from silently billing at your session model's
+rate. One dependency, 27 tests, honest about where its numbers come from.
+
+## Before / After
+
+**Naive router (what most examples ship):**
+
+```python
+model = "claude-haiku-4-5" if len(prompt) < 200 else "claude-fable-5"
+response = client.messages.create(model=model, max_tokens=1024,
+                                  thinking={"type": "adaptive"}, messages=msgs)
+print(response.content[0].text)
+```
+
+Five lines, four production bugs: the `thinking` param 400s on the Haiku
+branch, Fable refusals arrive as **HTTP 200** with empty content so
+`content[0]` raises IndexError, 1024 `max_tokens` truncates thinking turns,
+and prompt length is not difficulty — a two-line prompt can be an
+architecture question.
+
+**This router:**
+
+```python
+from model_router import run
+
+result = run(client, prompt)           # classified, routed, streamed, fallback-protected
+print(result.text)
+print(result.served_by)                # actual model (matters after a refusal fallback)
+print(result.usage.output_tokens)      # the real bill, not an estimate
+```
+
+```
+┌────────────────────────────────────────────────┐
+│  MIXED-WORKLOAD COST         ▼ 26%             │
+│  SUPPORT-BOT-SHAPED COST     ▼ 70%+            │
+│  SUBAGENT SPAWN (hooked)     25.3k → 11.4k tok │
+│  TESTS                       27 green          │
+│  DEPENDENCIES                1 (anthropic)     │
+└────────────────────────────────────────────────┘
+```
 
 ## Why naive Claude routers break
 
@@ -36,7 +80,11 @@ The keyword-heuristic fallback (used when the classifier call fails) never
 assigns trivial — misrouting real work to Haiku costs more in retries than
 the tier saves, so only the classifier may pick it.
 
-## Usage
+## Install
+
+```bash
+pip install claude-model-router
+```
 
 ```python
 import anthropic
@@ -46,8 +94,6 @@ client = anthropic.Anthropic()
 
 result = run(client, "Refactor the auth module across services")
 print(result.route.model, result.route.source)  # claude-fable-5 classifier
-print(result.served_by)                          # may be opus-4-8 after a fallback
-print(result.text)
 ```
 
 Multi-turn: prompt caches are model-scoped, so route once per conversation
@@ -58,7 +104,21 @@ route = result.route
 result2 = execute(client, route, full_message_history)
 ```
 
-## Cost model
+From source:
+
+```bash
+git clone https://github.com/junoseong/claude-model-router
+cd claude-model-router
+python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'
+.venv/bin/pytest
+```
+
+## Benchmarks
+
+Two kinds, clearly labeled. Calculated numbers are calculated; live numbers
+come from the `usage` block of real API responses. No third kind.
+
+### Cost model (calculated, spends nothing)
 
 1,000 prompts, mixed workload (30% trivial / 40% low / 20% mid / 10% high),
 list pricing, output token counts held equal across models (conservative —
@@ -81,44 +141,47 @@ workload (mostly trivial/low) saves 70%+. Rerun with your own shape:
 python benchmarks/cost_model.py
 ```
 
-This is a pricing calculation, not a live benchmark — it spends no tokens
-and its assumptions are at the top of the script.
-
 ### Live benchmark (real tokens, real dollars)
 
 [`benchmarks/live_bench.py`](benchmarks/live_bench.py) runs a 17-prompt
-mixed workload through both arms — routed vs. all-Fable — with **real API
-calls**, and prices each call from the `usage` block the API actually
-returned (by the model that actually served it, which matters after a
-fallback). Classifier overhead is metered from real Haiku usage, not
-estimated.
+mixed workload — real bug hunt, real security review, real architecture
+questions — through both arms with **real API calls**, and prices every call
+from the `usage` block the API actually returned, by the model that actually
+served it (which matters after a fallback). Classifier overhead is metered
+from real Haiku usage, not estimated. Misroutes are flagged per prompt so
+you audit disagreements instead of trusting one savings number.
 
 ```bash
-ANTHROPIC_API_KEY=... python benchmarks/live_bench.py --tiers trivial,low  # cheap smoke run
-ANTHROPIC_API_KEY=... python benchmarks/live_bench.py --out live_results.md  # full run, ~$2-6
+ANTHROPIC_API_KEY=... python benchmarks/live_bench.py --tiers trivial,low   # smoke run, cents
+ANTHROPIC_API_KEY=... python benchmarks/live_bench.py --out live_results.md # full run, ~$2-6
 ```
 
-It spends real money (the all-Fable arm at xhigh dominates), refuses to
-start without a key, and flags every prompt where the classifier's tier
-disagreed with the expected tier — so you can audit misroutes instead of
-trusting a single savings number. `RoutedResult.usage` exposes the same
-real token counts in your own code.
+It refuses to start without a key. This is the same cost-vs-quality
+methodology RouterBench and RouteLLM run offline, at a scale one person can
+afford to reproduce — read the transcripts before trusting the number,
+because a router that saves money by giving worse answers saves nothing.
 
-This is the honest version of the standard methodology: the same
-cost-quality comparison RouterBench and RouteLLM run offline, at a scale
-one person can afford to reproduce.
+## The Claude Code hook: your subagents are billing at Fable rates
 
-## Claude Code hook: stop subagents from burning Fable tokens
-
-Separate deliverable, same philosophy. In Claude Code, **subagents inherit
-the session model by default** — run your session on an expensive model and
-every spawned agent (including greps and file listings) bills at that rate.
+In Claude Code, **subagents inherit the session model by default** — run
+your session on an expensive model and every spawned agent, including greps
+and file listings, bills at that rate.
 
 [`hooks/subagent-router.py`](hooks/subagent-router.py) is a PreToolUse hook
 that denies any Agent spawn missing an explicit `model` param. The deny
 reason carries a routing table, so the session model immediately re-issues
-the spawn with the cheapest capable tier. Self-correcting, one file, no
+the spawn on the cheapest capable tier. Self-correcting, one file, zero
 dependencies.
+
+Measured on a live Claude Code session, same investigation task:
+
+| | Tokens | Tool calls |
+|---|---|---|
+| No hook — spawn inherits session model | 25.3k | 3 |
+| Hook — denied once, re-spawned with explicit cheap model | 11.4k | 1 |
+
+The deny feedback didn't just move the spawn to a cheaper model — the
+session model also wrote a tighter prompt on the retry.
 
 Install:
 
@@ -149,26 +212,15 @@ with explicit `model` (haiku for greps/locates, sonnet for single-file work
 and reviews, opus for multi-file/hard debugging, session model only for
 judgment-critical synthesis).
 
-## Install
-
-```bash
-pip install claude-model-router
-```
-
-Or from source:
-
-```bash
-git clone https://github.com/junoseong/claude-model-router
-cd claude-model-router
-python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'
-.venv/bin/pytest
-```
-
 ## Notes
 
 - Fable 5 requires 30-day data retention; zero-data-retention orgs get 400s
   on the high tier — remap `high` to `claude-opus-4-8` in `_TIER_ROUTES`.
 - Sonnet 5 has intro pricing ($2/$10 per MTok) through 2026-08-31; the cost
   model uses sticker prices ($3/$15).
+
+## Star this repo
+
+Router saves you money. Star costs zero. Fair trade. ⭐
 
 MIT licensed.
