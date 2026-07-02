@@ -1,6 +1,6 @@
 # claude-model-router
 
-**why pay Fable price when Haiku do trick**
+**Route every prompt to the cheapest Claude model that can handle it.**
 
 [![PyPI](https://img.shields.io/pypi/v/claude-model-router)](https://pypi.org/project/claude-model-router/)
 [![CI](https://github.com/junoseong/claude-model-router/actions/workflows/test.yml/badge.svg)](https://github.com/junoseong/claude-model-router/actions/workflows/test.yml)
@@ -219,8 +219,8 @@ judgment-critical synthesis).
 - Sonnet 5 has intro pricing ($2/$10 per MTok) through 2026-08-31; the cost
   model uses sticker prices ($3/$15).
 
-## Star this repo
+---
 
-Router saves you money. Star costs zero. Fair trade. ⭐
+If this saved you money, a ⭐ helps others find it.
 
 MIT licensed.
