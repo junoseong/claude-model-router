@@ -87,6 +87,19 @@ class TestExecute:
         result = execute(FakeClient(messages), OPUS_ROUTE, MSGS)
         assert result.text == "part1 part2"
 
+    def test_usage_passed_through_for_cost_tracking(self):
+        from types import SimpleNamespace
+
+        messages = FakeMessages(
+            stream_response=make_response(
+                [text_block("ok")],
+                usage=SimpleNamespace(input_tokens=123, output_tokens=456),
+            )
+        )
+        result = execute(FakeClient(messages), OPUS_ROUTE, MSGS)
+        assert result.usage.input_tokens == 123
+        assert result.usage.output_tokens == 456
+
     def test_served_by_reports_fallback_model(self):
         beta = FakeMessages(
             stream_response=make_response(

@@ -66,7 +66,7 @@ class Route:
     model: str
     effort: str | None
     tier: Tier
-    source: str  # "classifier" | "heuristic"
+    source: str  # "classifier" | "heuristic" | "fixed" (caller-pinned route)
 
 
 def heuristic_tier(prompt: str, context_tokens: int = 0) -> Tier:

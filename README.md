@@ -84,6 +84,30 @@ python benchmarks/cost_model.py
 This is a pricing calculation, not a live benchmark — it spends no tokens
 and its assumptions are at the top of the script.
 
+### Live benchmark (real tokens, real dollars)
+
+[`benchmarks/live_bench.py`](benchmarks/live_bench.py) runs a 17-prompt
+mixed workload through both arms — routed vs. all-Fable — with **real API
+calls**, and prices each call from the `usage` block the API actually
+returned (by the model that actually served it, which matters after a
+fallback). Classifier overhead is metered from real Haiku usage, not
+estimated.
+
+```bash
+ANTHROPIC_API_KEY=... python benchmarks/live_bench.py --tiers trivial,low  # cheap smoke run
+ANTHROPIC_API_KEY=... python benchmarks/live_bench.py --out live_results.md  # full run, ~$2-6
+```
+
+It spends real money (the all-Fable arm at xhigh dominates), refuses to
+start without a key, and flags every prompt where the classifier's tier
+disagreed with the expected tier — so you can audit misroutes instead of
+trusting a single savings number. `RoutedResult.usage` exposes the same
+real token counts in your own code.
+
+This is the honest version of the standard methodology: the same
+cost-quality comparison RouterBench and RouteLLM run offline, at a scale
+one person can afford to reproduce.
+
 ## Claude Code hook: stop subagents from burning Fable tokens
 
 Separate deliverable, same philosophy. In Claude Code, **subagents inherit

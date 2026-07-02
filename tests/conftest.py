@@ -26,12 +26,14 @@ def make_response(
     stop_reason="end_turn",
     model="claude-test",
     stop_details=None,
+    usage=None,
 ) -> FakeResponse:
     return FakeResponse(
         content=content,
         stop_reason=stop_reason,
         model=model,
         stop_details=stop_details,
+        usage=usage or SimpleNamespace(input_tokens=0, output_tokens=0),
     )
 
 

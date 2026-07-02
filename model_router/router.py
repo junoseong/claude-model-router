@@ -42,6 +42,7 @@ class RoutedResult:
     route: Route
     served_by: str  # actual model that answered; differs from route.model after a fallback
     stop_reason: str | None
+    usage: Any = None  # response.usage — real token counts, for cost tracking
 
 
 def build_request(route: Route, messages: list[dict]) -> dict:
@@ -79,6 +80,7 @@ def execute(
         route=route,
         served_by=response.model,
         stop_reason=response.stop_reason,
+        usage=getattr(response, "usage", None),
     )
 
 
