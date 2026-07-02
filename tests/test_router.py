@@ -15,6 +15,7 @@ from tests.conftest import FakeClient, FakeMessages, make_response, text_block, 
 FABLE_ROUTE = Route(model="claude-fable-5", effort="xhigh", tier="high", source="classifier")
 OPUS_ROUTE = Route(model="claude-opus-4-8", effort="high", tier="mid", source="classifier")
 SONNET_ROUTE = Route(model="claude-sonnet-5", effort="medium", tier="low", source="classifier")
+HAIKU_ROUTE = Route(model="claude-haiku-4-5", effort=None, tier="trivial", source="classifier")
 
 MSGS = [{"role": "user", "content": "hello"}]
 
@@ -37,6 +38,13 @@ class TestBuildRequest:
     def test_sonnet_gets_adaptive_thinking(self):
         kwargs = build_request(SONNET_ROUTE, MSGS)
         assert kwargs["thinking"] == {"type": "adaptive"}
+
+    def test_haiku_gets_no_thinking_no_effort_no_fallbacks(self):
+        kwargs = build_request(HAIKU_ROUTE, MSGS)
+        assert "thinking" not in kwargs  # adaptive thinking 400s on Haiku 4.5
+        assert "output_config" not in kwargs  # effort param 400s on Haiku 4.5
+        assert "betas" not in kwargs
+        assert "fallbacks" not in kwargs
 
 
 class TestExecute:

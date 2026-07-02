@@ -6,9 +6,14 @@ the prompt executes on the cheapest capable tier:
 
 | Tier | Model | Effort | Notes |
 |------|-------|--------|-------|
+| trivial | `claude-haiku-4-5` | — | no thinking/effort params (both 400 on Haiku 4.5); bumped to low when context > 180K (200K window) |
 | low  | `claude-sonnet-5`  | medium | adaptive thinking |
 | mid  | `claude-opus-4-8`  | high   | adaptive thinking (explicit — omitted = off) |
 | high | `claude-fable-5`   | xhigh  | thinking always on; server-side fallback to Opus 4.8 on refusal |
+
+The keyword-heuristic fallback never assigns trivial — misrouting real
+work to Haiku costs more in retries than the tier saves, so only the
+classifier may pick it.
 
 ## Usage
 

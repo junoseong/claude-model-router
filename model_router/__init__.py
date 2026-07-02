@@ -3,9 +3,10 @@
 Classifies prompt complexity with a cheap Haiku call (keyword heuristic
 as fallback) and executes on the cheapest capable model tier:
 
-    low  -> claude-sonnet-5  @ medium effort
-    mid  -> claude-opus-4-8  @ high effort (adaptive thinking)
-    high -> claude-fable-5   @ xhigh effort (server-side fallback to Opus 4.8)
+    trivial -> claude-haiku-4-5 (no thinking; bumped to low if context > 180K)
+    low     -> claude-sonnet-5  @ medium effort
+    mid     -> claude-opus-4-8  @ high effort (adaptive thinking)
+    high    -> claude-fable-5   @ xhigh effort (server-side fallback to Opus 4.8)
 """
 
 from .classifier import Route, Tier, classify, heuristic_tier

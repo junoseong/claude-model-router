@@ -13,22 +13,28 @@ from typing import Literal
 
 import anthropic
 
-Tier = Literal["low", "mid", "high"]
+Tier = Literal["trivial", "low", "mid", "high"]
 
 CLASSIFIER_MODEL = "claude-haiku-4-5"
+
+# Haiku 4.5 has a 200K context window (every other tier model has 1M);
+# trivial-tier work that arrives with more context than this gets bumped
+# to the low tier instead. Margin left for output and system prompt.
+_HAIKU_CONTEXT_LIMIT = 180_000
 
 # Complexity is judged from the head of the prompt plus size metadata;
 # feeding the whole prompt to the classifier would defeat its purpose.
 _CLASSIFY_SNIPPET_CHARS = 2000
 
 _CLASSIFIER_SYSTEM = """\
-You route coding prompts to one of three capability tiers. Reply with exactly one word.
+You route coding prompts to one of four capability tiers. Reply with exactly one word.
 
-low  - lookups, summaries, single-function edits, boilerplate, simple Q&A
-mid  - debugging, security review, tricky edge cases, single-file refactors
-high - multi-file refactors, migrations, architecture design, codebase-wide optimization
+trivial - reformatting, extraction, classification, lookups with obvious answers
+low     - summaries, single-function edits, boilerplate, simple Q&A
+mid     - debugging, security review, tricky edge cases, single-file refactors
+high    - multi-file refactors, migrations, architecture design, codebase-wide optimization
 
-Reply with: low, mid, or high. Nothing else."""
+Reply with: trivial, low, mid, or high. Nothing else."""
 
 _HIGH_KEYWORDS = (
     "migration",
@@ -46,7 +52,9 @@ _MID_KEYWORDS = (
     "regex",
 )
 
-_TIER_ROUTES: dict[Tier, tuple[str, str]] = {
+# effort None = model predates output_config.effort; omit the param.
+_TIER_ROUTES: dict[Tier, tuple[str, str | None]] = {
+    "trivial": ("claude-haiku-4-5", None),
     "low": ("claude-sonnet-5", "medium"),
     "mid": ("claude-opus-4-8", "high"),
     "high": ("claude-fable-5", "xhigh"),
@@ -56,13 +64,18 @@ _TIER_ROUTES: dict[Tier, tuple[str, str]] = {
 @dataclass(frozen=True)
 class Route:
     model: str
-    effort: str
+    effort: str | None
     tier: Tier
     source: str  # "classifier" | "heuristic"
 
 
 def heuristic_tier(prompt: str, context_tokens: int = 0) -> Tier:
-    """Keyword/size fallback used when the classifier call fails."""
+    """Keyword/size fallback used when the classifier call fails.
+
+    Never returns "trivial": keywords can't reliably separate trivial
+    from low, and misrouting real work to Haiku costs more in retries
+    than the tier saves. Only the classifier may assign trivial.
+    """
     p = prompt.lower()
     if any(k in p for k in _HIGH_KEYWORDS) or context_tokens > 400_000:
         return "high"
@@ -104,5 +117,7 @@ def classify(
     if tier is None:
         tier = heuristic_tier(prompt, context_tokens)
         source = "heuristic"
+    if tier == "trivial" and context_tokens > _HAIKU_CONTEXT_LIMIT:
+        tier = "low"
     model, effort = _TIER_ROUTES[tier]
     return Route(model=model, effort=effort, tier=tier, source=source)

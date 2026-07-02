@@ -48,12 +48,17 @@ def build_request(route: Route, messages: list[dict]) -> dict:
     kwargs: dict = {
         "model": route.model,
         "max_tokens": MAX_TOKENS,
-        "output_config": {"effort": route.effort},
         "messages": messages,
     }
+    if route.effort is not None:
+        kwargs["output_config"] = {"effort": route.effort}
     if route.model == "claude-fable-5":
         kwargs["betas"] = [FALLBACK_BETA]
         kwargs["fallbacks"] = [{"model": FABLE_FALLBACK_MODEL}]
+    elif route.model.startswith("claude-haiku"):
+        # Haiku 4.5 predates adaptive thinking and effort; sending either
+        # returns a 400. Thinking defaults off, which is right for trivial work.
+        pass
     else:
         kwargs["thinking"] = {"type": "adaptive"}
     return kwargs

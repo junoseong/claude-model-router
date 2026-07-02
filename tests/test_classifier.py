@@ -22,6 +22,26 @@ class TestHeuristicTier:
         assert heuristic_tier("what does this function return?") == "low"
 
 
+class TestTrivialTier:
+    def test_classifier_verdict_routes_to_haiku(self):
+        messages = FakeMessages(create_response=make_response([text_block("trivial")]))
+        route = classify(FakeClient(messages), "extract the date from this line")
+        assert (route.model, route.effort) == ("claude-haiku-4-5", None)
+        assert route.tier == "trivial"
+
+    def test_trivial_bumped_to_low_when_context_exceeds_haiku_window(self):
+        messages = FakeMessages(create_response=make_response([text_block("trivial")]))
+        route = classify(FakeClient(messages), "extract the date", context_tokens=190_000)
+        assert route.model == "claude-sonnet-5"
+        assert route.tier == "low"
+
+    def test_heuristic_never_assigns_trivial(self):
+        messages = FakeMessages(create_error=anthropic.AnthropicError("boom"))
+        route = classify(FakeClient(messages), "reformat this csv line")
+        assert route.source == "heuristic"
+        assert route.model == "claude-sonnet-5"
+
+
 class TestClassify:
     def test_uses_classifier_verdict(self):
         messages = FakeMessages(create_response=make_response([text_block("high")]))
