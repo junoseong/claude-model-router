@@ -163,6 +163,12 @@ because a router that saves money by giving worse answers saves nothing.
 
 ## The Claude Code hook: your subagents are billing at Fable rates
 
+> **The hook graduated to its own repo:
+> [subagent-bouncer](https://github.com/junoseong/subagent-bouncer)** —
+> installable as a Claude Code plugin in two commands, with its own tests.
+> The copy in [`hooks/`](hooks/) stays for pip users; new development
+> happens there.
+
 In Claude Code, **subagents inherit the session model by default** — run
 your session on an expensive model and every spawned agent, including greps
 and file listings, bills at that rate.
